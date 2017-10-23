@@ -123,3 +123,11 @@ def getter(num):
     
     # here we need to split it based on periods, but ignoring 'forkortelser'
     return(result)
+
+#%%
+# write it all to a .csv file. REMEMBER, IMPORT WITH UTF-8 ENCODING!!!
+def importer(num):
+    res = getter(num)
+    with open("output.csv", 'wb', encoding = "utf-8") as resultFile:
+        wr = csv.writer(resultFile, dialect = "excel")
+        wr.writerow(res)
