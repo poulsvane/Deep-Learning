@@ -32,11 +32,14 @@ while decrement:
 # load the dictionary of word stem into memory
 
 # load a number of sentences, encoded as a tuple of 2 numbers.
-with open("Data\onehot_encoded.csv", mode='r') as oneHotEncoded:
-    
+with open("Data\onehot_encoded.csv", mode='r') as oneHotEncoded:    
     reader = csv.reader(oneHotEncoded, delimiter = ";")
     listOfSentences = []
+    count = 0
     for row in reader:
+        #if count>20000:
+        #    break
+        #count =count+1
         mads = ""
         for noget in row:
             mads=mads+noget
@@ -44,7 +47,8 @@ with open("Data\onehot_encoded.csv", mode='r') as oneHotEncoded:
         s = ""
         for number in re.findall(pattern, mads):
             s = s + str(number) + " "
-        if "99060" in s:  
+        sen = len(s.split(' '))
+        if "99060" in s and sen<20:  
             #print(s)
             listOfSentences.append(s)
         
@@ -77,11 +81,15 @@ def get_batch_comma(batch_size = 100, indices_of_interest = [0,1,2]):
         
         text_target_out = str(listOfIntTarget.index('99060'))+stop_character #text_target[0] + stop_character
         #print("Target: ", text_target_out)
-        
+                
         #generate the targets as a list of integers
         int_target_in = [int(digit) for digit in listOfIntTarget if digit is not '']
 
-        int_target_out = [listOfIntTarget.index('99060'), 125000]
+        int_target_out = [listOfIntTarget.index('99060'), 20]
+        #remove the comma from the sentence, as the task is to predict the comma, and not just look for it
+        #but leave the comma in the text input, as that is just used for easier debugging
+        int_target_in.remove(99060)
+        
         #print("int_target_in", int_target_in)
         #print(int_target_out)
 
