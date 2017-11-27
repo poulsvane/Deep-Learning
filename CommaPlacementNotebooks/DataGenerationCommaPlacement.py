@@ -85,7 +85,7 @@ def get_batch_comma(batch_size = 100, indices_of_interest = [0,1,2]):
         #generate the targets as a list of integers
         int_target_in = [int(digit) for digit in listOfIntTarget if digit is not '']
 
-        int_target_out = [listOfIntTarget.index('99060'), 20]
+        int_target_out = [listOfIntTarget.index('99060')]
         #remove the comma from the sentence, as the task is to predict the comma, and not just look for it
         #but leave the comma in the text input, as that is just used for easier debugging
         int_target_in.remove(99060)
@@ -108,31 +108,39 @@ def get_batch_comma(batch_size = 100, indices_of_interest = [0,1,2]):
         inputs[i,:cur_len] = inp
 #        input_masks[i,:cur_len] = 1
 #     inputs_seqlen = np.asarray(map(len, int_inputs))
-    inputs_seqlen = np.asarray([len(i) for i in int_inputs])
+    inputs_seqlen = np.asarray([len(i) for i in int_targets_in])
     
-    #not sure if this is really needed?
+    #pad the target sequene of the encoding 
     max_target_in_len = max([len(list(i)) for i in int_targets_in])
     targets_in = np.zeros((batch_size, max_target_in_len))
-    targets_mask = np.zeros((batch_size, max_target_in_len))
     for (i, tar) in enumerate(int_targets_in):
         cur_len = len(tar)
         targets_in[i, :cur_len] = tar
 #     targets_seqlen = np.asarray(map(len, int_targets_in))
-    targets_seqlen = np.asarray([len(i) for i in int_targets_in])
+    targets_in_seqlen = np.asarray([len(i) for i in int_targets_in])
 
-    
+    #Determine the length of the target sequence of the *decoding*
     max_target_out_len = max(map(len, int_targets_out))
-    targets_out = np.zeros((batch_size, max_target_in_len))
+    targets_mask = np.zeros((batch_size, max_target_out_len))
+    targets_out = np.zeros((batch_size, max_target_out_len))
     for (i,tar) in enumerate(int_targets_out):
         cur_len = len(tar)
         targets_out[i,:cur_len] = tar
         targets_mask[i,:cur_len] = 1    
-
-    return  inputs.astype('int32'), \
+    targets_out_seqlen = np.asarray([1 for i in int_targets_out])
+    
+        # The encoded inputs
+        # The length of the input sequence
+        #The encoded input sequence (same as the inputs, as no encoding happens in the 'encoder network'
+        # the target of the output sequence. I.e. the target of the network
+        #the length of the target output sequence
+        #the important parts of the output sequence
+    return  inputs.astype('int32'),  \
             inputs_seqlen.astype('int32'), \
             targets_in.astype('int32'), \
             targets_out.astype('int32'), \
-            targets_seqlen.astype('int32'), \
+            targets_in_seqlen.astype('int32'), \
+            targets_out_seqlen.astype('int32'),\
             targets_mask.astype('float32'), \
             text_targets_in, \
             text_targets_out

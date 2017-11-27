@@ -166,7 +166,7 @@ def decoder(initial_state, target_input, target_len, num_units,
 
     with tf.variable_scope(name):
         # we need the max seq len to optimize our RNN computation later on
-        max_sequence_length = tf.reduce_max(target_len)
+        max_sequence_length = 1 #tf.reduce_max(target_len)
         # target_dims is just the embedding size
         target_dims = target_input.get_shape()[2]
         # set up weights for the GRU gates
