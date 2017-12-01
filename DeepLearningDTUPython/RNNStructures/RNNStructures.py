@@ -8,14 +8,13 @@ import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython import display
-from data_generator_tensorflow import get_batch, print_valid_characters
 from DataGenerationCommaPlacement import get_batch_comma
 from DataGenerationCommaPlacement import num_of_training_samples
 
 import os
 import sys
 sys.path.append(os.path.join('.', '..')) 
-from tempUtils import utils 
+#from tempUtils import utils
 
 import tf_utils
 
@@ -62,9 +61,9 @@ BATCH_SIZE = 100
 LEARNING_RATE = 0.005 #0.005
 X_EMBEDDINGS = 8
 t_EMBEDDINGS = 8
-NUM_UNITS_ENC = 128
-NUM_UNITS_DEC = 128
-number_of_layers = 4
+NUM_UNITS_ENC = 256 #512
+NUM_UNITS_DEC = 256 #512
+number_of_layers = 4 #3
 
 
 # Setting up placeholders, these are the tensors that we "feed" to our network
@@ -154,7 +153,7 @@ y_valid = valid_out_tensor
 # print all the variable names and shapes
 for var in tf.global_variables ():
     s = var.name + " "*(40-len(var.name))
-    print(s, var.value().get_shape())
+   # print(s, var.value().get_shape())
 
 #--------------------------------------------Defining loss, cost funtion etc.----------------------------------------------------
 
@@ -163,12 +162,12 @@ def loss_and_acc(preds):
     # TensorFlow's seq2seq loss works with a 2D list instead of a 3D tensors
     loss = tf_utils.sequence_loss_tensor(preds, ts_out, t_mask, NUM_OUTPUTS) # notice that we use ts_out here!
 
-    ## if you want regularization
-    #reg_scale = 0.00001
-    #regularize = tf.contrib.layers.l2_regularizer(reg_scale)
-    #params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
-    #reg_term = sum([regularize(param) for param in params])
-    #loss += reg_term
+    # if you want regularization
+    reg_scale = 0.00001
+    regularize = tf.contrib.layers.l2_regularizer(reg_scale)
+    params = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES)
+    reg_term = sum([regularize(param) for param in params])
+    loss += reg_term
     
     ## calculate accuracy
     argmax = tf.to_int32(tf.argmax(preds, 2))
@@ -182,8 +181,9 @@ loss_valid, accuracy_valid, predictions_valid = loss_and_acc(y_valid)
 # use lobal step to keep track of our iterations
 global_step = tf.Variable(0, name='global_step', trainable=False)
 
-# pick optimizer, try momentum or adadelta
-optimizer = tf.train.AdamOptimizer(LEARNING_RATE)
+# pick optimizer, try momentum or adadelta epsilon has to be higher than the standard, as it will otherwise cause the
+#optimizer to go crazy when close to the global optimum.
+optimizer = tf.train.AdamOptimizer(LEARNING_RATE, epsilon= 0.001)
 
 # extract gradients for each variable
 grads_and_vars = optimizer.compute_gradients(loss)
@@ -200,7 +200,7 @@ train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 # notice that we now have the optimizer Adam as well!
 for var in tf.all_variables():
     s = var.name + " "*(40-len(var.name))
-    print(s, var.value().get_shape())
+    #print(s, var.value().get_shape())
 
 #----------------------------------------------------Test the forward pass:-----------------------------------------------------
 ## Start the session
@@ -248,12 +248,12 @@ res = sess.run(fetches=fetches, feed_dict=feed_dict)
 print("y_valid", res[0].shape)
 
 #Some Data hyperparameters
-num_epochs = 10
+num_epochs = 800
 num_of_training_samples_loaded = num_of_training_samples()
-num_of_samples_for_validation = 1000
+num_of_samples_for_validation = 10000
 num_of_training_samples_minus_validation = num_of_training_samples_loaded - num_of_samples_for_validation
 num_batches_train = int(num_of_training_samples_minus_validation / BATCH_SIZE)
-print(num_batches_train)
+print("number of batches", num_batches_train)
 
 #--------------------------------------------------Generate validation  data - to be replaced--------------------------------------
 #Generate some validation data
@@ -272,16 +272,21 @@ print("t_out_val", t_out_val.shape)
 
 # setting up running parameters
 val_interval = 200
-
+saver = tf.train.Saver()
 samples_val = []
-costs, accs_val = [], []
+epochs, costs, accs_val = [], [], []
 plt.figure()
+train_acc = []
 batch_number = 0
 try:
     for epoch in range(num_epochs):
         epoch_batches = []
         accs_val = []
+        loss_train = 0
+        acc_train = 0
         print("Epoch: ", epoch)
+        if num_epochs % 10 == 0:
+            saver.save(sess, "/tmp/RNN/modelRNN.ckpt", global_step=epoch)
         for i in range(num_batches_train): 
             # load data
             #print("Epoch {0} new Batch: {1} ".format(epoch, i))
@@ -299,8 +304,9 @@ try:
             # run the model
             res = tuple(sess.run(fetches=fetches_tr, feed_dict=feed_dict_tr))
             _, batch_cost, batch_acc = res
-            costs += [batch_cost]
-            
+            loss_train += batch_cost
+            acc_train += batch_acc
+
             #if samples_processed % 1000 == 0: print(batch_cost, batch_acc)
             #validation data
             if i % val_interval == 0:
@@ -317,6 +323,7 @@ try:
                 print("Epoch-batches ", epoch_batches)
                 print("accs_val: ", accs_val)
                 print("accs_train: ", accuracy)
+                plt.figure(1)
                 plt.plot(epoch_batches, accs_val, 'g-')
                 plt.ylabel('Validation Accuracy', fontsize=15)
                 plt.xlabel('Epoch+Sample', fontsize=15)
@@ -325,6 +332,32 @@ try:
                 plt.savefig("out.png")
                 display.display(display.Image(filename="out.png"))
                 display.clear_output(wait=True)
+
+        costs += [loss_train]
+        epochs += [epoch]
+        train_acc += [acc_train/num_batches_train]
+        print("Costs: ", costs)
+        print("Epochs: ", epochs)
+        print("train Acc:" , train_acc)
+        # plt.subplot(num_classes + 2, 2, 3)
+        plt.figure(2)
+        plt.legend('training loss')
+        plt.ylabel('cost')
+        plt.plot(epochs, costs, color="green")
+        # plt.plot(updates, KL_valid, color="blue", linestyle="--")
+        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+        plt.grid('on')
+        plt.savefig("outLoss.png")
+
+        # plt.subplot(num_classes + 2, 2, 3)
+        plt.figure(3)
+        plt.legend('training Acc')
+        plt.ylabel('Acc')
+        plt.plot(epochs, train_acc, color="red")
+        # plt.plot(updates, KL_valid, color="blue", linestyle="--")
+        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+        plt.grid('on')
+        plt.savefig("outTrainAcc.png")
 except KeyboardInterrupt:
     pass
 
@@ -344,7 +377,7 @@ plt.show()
 # Read more about saving and loading models at https://www.tensorflow.org/programmers_guide/saved_model
 
 # Save model
-save_path = tf.train.Saver().save(sess, "/tmp/model.ckpt")
+save_path = tf.train.Saver().save(sess, "/tmp/modelRNN.ckpt")
 print("Model saved in file: %s" % save_path)
 
 ## Close the session, and free the resources
