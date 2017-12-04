@@ -8,8 +8,8 @@ import matplotlib
 import numpy as np
 import matplotlib.pyplot as plt
 from IPython import display
-from DataGenerationCommaPlacement import get_batch_comma
-from DataGenerationCommaPlacement import num_of_training_samples
+from DataGenerationSequenceCommaPlacement import get_batch_comma
+from DataGenerationSequenceCommaPlacement import num_of_training_samples
 
 import os
 import sys
@@ -53,8 +53,8 @@ for i in range(batch_size):
 tf.reset_default_graph()
 
 # Setting up hyperparameters and general configs
-NUM_INPUTS = 125002
-NUM_OUTPUTS = 20 #(0-19 +",")
+NUM_INPUTS = 133000
+NUM_OUTPUTS = 3#0,1,2 #(0-19 +",")
 
 BATCH_SIZE = 100
 # try various learning rates 1e-2 to 1e-5
@@ -63,7 +63,7 @@ X_EMBEDDINGS = 8
 t_EMBEDDINGS = 8
 NUM_UNITS_ENC = 256 #512
 NUM_UNITS_DEC = 256 #512
-number_of_layers = 4 #3
+number_of_layers = 3 #3
 
 
 # Setting up placeholders, these are the tensors that we "feed" to our network
@@ -137,9 +137,10 @@ valid_out_tensor = tf.matmul(valid_out_tensor, W_out) + b_out
 ## reshaping back to sequence
 # print('X_len', tf.shape(X_len)[0])
 b_size = tf.shape(X_len)[0] # use a variable we know has batch_size in [0]
+seq_length = tf.shape(t_embedded)[1] # variable we know has sequence length in [1]
 num_out = tf.constant(NUM_OUTPUTS) # casting NUM_OUTPUTS to a tensor variable
 out_shape = tf.concat([tf.expand_dims(b_size, 0),
-                      tf.expand_dims(t_out_len[0],0),
+                      tf.expand_dims(seq_length,0),
                       tf.expand_dims(num_out, 0)],
                      axis=0)
 
