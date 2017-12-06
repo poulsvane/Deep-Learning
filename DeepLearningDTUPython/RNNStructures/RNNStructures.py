@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from IPython import display
 from DataGenerationSequenceCommaPlacement import get_batch_comma
 from DataGenerationSequenceCommaPlacement import num_of_training_samples
+from DataGenerationSequenceCommaPlacement import get_word_stem_from_encoding
 
 import os
 import sys
@@ -21,7 +22,7 @@ import tf_utils
 
 # At the bottom of the script there is some code which saves the model.
 # If you wish to restore your model from a previous state use this function.
-load_model = False
+load_model = True
 
 #-------------------------------------------- play around with input data... to be replaced with specific code------------------
 batch_size = 2
@@ -54,16 +55,16 @@ tf.reset_default_graph()
 
 # Setting up hyperparameters and general configs
 NUM_INPUTS = 133000
-NUM_OUTPUTS = 3#0,1,2 #(0-19 +",")
+NUM_OUTPUTS = 2#0,1,2 #(0-19 +",")
 
-BATCH_SIZE = 100
+BATCH_SIZE = 512
 # try various learning rates 1e-2 to 1e-5
 LEARNING_RATE = 0.005 #0.005
 X_EMBEDDINGS = 8
 t_EMBEDDINGS = 8
-NUM_UNITS_ENC = 256 #512
-NUM_UNITS_DEC = 256 #512
-number_of_layers = 3 #3
+NUM_UNITS_ENC = 16 #512
+NUM_UNITS_DEC = 16 #512
+number_of_layers = 1 #3
 
 
 # Setting up placeholders, these are the tensors that we "feed" to our network
@@ -212,7 +213,7 @@ sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
 # Initialize parameters
 if load_model:
     try:
-        tf.train.Saver().restore(sess, "/save/model.ckpt")
+        tf.train.Saver().restore(sess, "/tmp/RNN/modelRNN.ckpt-120")
     except:
         sess.run(tf.global_variables_initializer())
         print('Model not found, new parameters initialized')
@@ -249,7 +250,7 @@ res = sess.run(fetches=fetches, feed_dict=feed_dict)
 print("y_valid", res[0].shape)
 
 #Some Data hyperparameters
-num_epochs = 800
+num_epochs = 200
 num_of_training_samples_loaded = num_of_training_samples()
 num_of_samples_for_validation = 10000
 num_of_training_samples_minus_validation = num_of_training_samples_loaded - num_of_samples_for_validation
@@ -272,114 +273,156 @@ print("t_out_val", t_out_val.shape)
 ## If you get an error, remove this line! It makes the error message hard to understand.
 
 # setting up running parameters
-val_interval = 200
+val_interval = 40
 saver = tf.train.Saver()
 samples_val = []
 epochs, costs, accs_val = [], [], []
 plt.figure()
 train_acc = []
 batch_number = 0
-try:
-    for epoch in range(num_epochs):
-        epoch_batches = []
-        accs_val = []
-        loss_train = 0
-        acc_train = 0
-        print("Epoch: ", epoch)
-        if num_epochs % 10 == 0:
-            saver.save(sess, "/tmp/RNN/modelRNN.ckpt", global_step=epoch)
-        for i in range(num_batches_train): 
-            # load data
-            #print("Epoch {0} new Batch: {1} ".format(epoch, i))
-            
-            #Select random part of the training data   
-            idxs = np.random.choice(range(num_of_training_samples_minus_validation), size=(BATCH_SIZE), replace=False)
-            X_tr, X_len_tr, t_in_tr, t_out_tr, t_len_in_tr, t_len_out_tr, t_mask_tr, \
-            text_targets_in_tr, text_targets_out_tr = \
-                get_batch_comma(batch_size=BATCH_SIZE, indices_of_interest = idxs)
-            # make fetches
-            fetches_tr = [train_op, loss, accuracy]
-            # set up feed dict
-            feed_dict_tr = {Xs: X_tr, X_len: X_len_tr, ts_in: t_in_tr,
-                 ts_out: t_out_tr, t_in_len: t_len_in_tr, t_out_len: t_len_out_tr, t_mask: t_mask_tr}
-            # run the model
-            res = tuple(sess.run(fetches=fetches_tr, feed_dict=feed_dict_tr))
-            _, batch_cost, batch_acc = res
-            loss_train += batch_cost
-            acc_train += batch_acc
+if load_model == False:
+    try:
+        for epoch in range(num_epochs):
+            epoch_batches = []
+            accs_val = []
+            loss_train = 0
+            acc_train = 0
+            print("Epoch: ", epoch)
+            if epoch % 5 == 0:
+                saver.save(sess, "/tmp/RNN/modelRNN.ckpt", global_step=epoch)
+            for i in range(num_batches_train):
+                # load data
+                # print("Epoch {0} new Batch: {1} ".format(epoch, i))
 
-            #if samples_processed % 1000 == 0: print(batch_cost, batch_acc)
-            #validation data
-            if i % val_interval == 0:
-                print("validating")
-                fetches_val = [accuracy_valid, y_valid]
-                feed_dict_val = {Xs: X_val, X_len: X_len_val, ts_in: t_in_val,
-                 ts_out: t_out_val, t_in_len: t_len_in_val, t_out_len: t_len_out_val, t_mask: t_mask_val}
-                res = tuple(sess.run(fetches=fetches_val, feed_dict=feed_dict_val))
-                
-                acc_val, output_val = res
-                
-                accs_val += [acc_val]
-                epoch_batches +=[epoch*num_batches_train+i]
-                print("Epoch-batches ", epoch_batches)
-                print("accs_val: ", accs_val)
-                print("accs_train: ", accuracy)
-                plt.figure(1)
-                plt.plot(epoch_batches, accs_val, 'g-')
-                plt.ylabel('Validation Accuracy', fontsize=15)
-                plt.xlabel('Epoch+Sample', fontsize=15)
-                plt.title('', fontsize=20)
-                plt.grid('on')
-                plt.savefig("out.png")
-                display.display(display.Image(filename="out.png"))
-                display.clear_output(wait=True)
+                # Select random part of the training data
+                idxs = np.random.choice(range(num_of_training_samples_minus_validation), size=(BATCH_SIZE), replace=False)
+                X_tr, X_len_tr, t_in_tr, t_out_tr, t_len_in_tr, t_len_out_tr, t_mask_tr, \
+                text_targets_in_tr, text_targets_out_tr = \
+                    get_batch_comma(batch_size=BATCH_SIZE, indices_of_interest=idxs)
+                # make fetches
+                fetches_tr = [train_op, loss, accuracy]
+                # set up feed dict
+                feed_dict_tr = {Xs: X_tr, X_len: X_len_tr, ts_in: t_in_tr,
+                                ts_out: t_out_tr, t_in_len: t_len_in_tr, t_out_len: t_len_out_tr, t_mask: t_mask_tr}
+                # run the model
+                res = tuple(sess.run(fetches=fetches_tr, feed_dict=feed_dict_tr))
+                _, batch_cost, batch_acc = res
+                loss_train += batch_cost
+                acc_train += batch_acc
 
-        costs += [loss_train]
-        epochs += [epoch]
-        train_acc += [acc_train/num_batches_train]
-        print("Costs: ", costs)
-        print("Epochs: ", epochs)
-        print("train Acc:" , train_acc)
-        # plt.subplot(num_classes + 2, 2, 3)
-        plt.figure(2)
-        plt.legend('training loss')
-        plt.ylabel('cost')
-        plt.plot(epochs, costs, color="green")
-        # plt.plot(updates, KL_valid, color="blue", linestyle="--")
-        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-        plt.grid('on')
-        plt.savefig("outLoss.png")
+                # if samples_processed % 1000 == 0: print(batch_cost, batch_acc)
+                # validation data
+                if i % val_interval == 0:
+                    print("validating")
+                    fetches_val = [accuracy_valid, y_valid]
+                    feed_dict_val = {Xs: X_val, X_len: X_len_val, ts_in: t_in_val,
+                                     ts_out: t_out_val, t_in_len: t_len_in_val, t_out_len: t_len_out_val,
+                                     t_mask: t_mask_val}
+                    res = tuple(sess.run(fetches=fetches_val, feed_dict=feed_dict_val))
 
-        # plt.subplot(num_classes + 2, 2, 3)
-        plt.figure(3)
-        plt.legend('training Acc')
-        plt.ylabel('Acc')
-        plt.plot(epochs, train_acc, color="red")
-        # plt.plot(updates, KL_valid, color="blue", linestyle="--")
-        plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
-        plt.grid('on')
-        plt.savefig("outTrainAcc.png")
-except KeyboardInterrupt:
-    pass
+                    acc_val, output_val = res
+
+                    accs_val += [acc_val]
+                    epoch_batches += [epoch * num_batches_train + i]
+                    print("Epoch-batches ", epoch_batches)
+                    print("accs_val: ", accs_val)
+                    print("accs_train: ", accuracy)
+                    plt.figure(1)
+                    plt.plot(epoch_batches, accs_val, 'g-')
+                    plt.ylabel('Validation Accuracy', fontsize=15)
+                    plt.xlabel('Epoch+Sample', fontsize=15)
+                    plt.title('', fontsize=20)
+                    plt.grid('on')
+                    plt.savefig("out.png")
+                    display.display(display.Image(filename="out.png"))
+                    display.clear_output(wait=True)
+
+            costs += [loss_train]
+            epochs += [epoch]
+            train_acc += [acc_train / num_batches_train]
+            print("Costs: ", costs)
+            print("Epochs: ", epochs)
+            print("train Acc:", train_acc)
+            # plt.subplot(num_classes + 2, 2, 3)
+            plt.figure(2)
+            plt.legend('training loss')
+            plt.ylabel('cost')
+            plt.plot(epochs, costs, color="green")
+            # plt.plot(updates, KL_valid, color="blue", linestyle="--")
+            plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+            plt.grid('on')
+            plt.savefig("outLoss.png")
+
+            # plt.subplot(num_classes + 2, 2, 3)
+            plt.figure(3)
+            plt.legend('training Acc')
+            plt.ylabel('Acc')
+            plt.plot(epochs, train_acc, color="red")
+            # plt.plot(updates, KL_valid, color="blue", linestyle="--")
+            plt.ticklabel_format(style='sci', axis='x', scilimits=(0, 0))
+            plt.grid('on')
+            plt.savefig("outTrainAcc.png")
+    except KeyboardInterrupt:
+        pass
+
+
 
 print('Done')
 #-------------------------------------------------------------------plotting-----------------------------------------------------
-#plot of validation accuracy for each target position
-plt.figure(figsize=(7,7))
-plt.plot(np.mean(np.argmax(output_val,axis=2)==t_out_val,axis=0))
-plt.ylabel('Accuracy', fontsize=15)
-plt.xlabel('Target position', fontsize=15)
-#plt.title('', fontsize=20)
-plt.grid('on')
-plt.show()
-#why do the plot look like this?
-#-------------------------------------------------------------------saving the model----------------------------------------------
-## Save model
-# Read more about saving and loading models at https://www.tensorflow.org/programmers_guide/saved_model
+# #plot of validation accuracy for each target position
+# plt.figure(figsize=(7,7))
+# plt.plot(np.mean(np.argmax(output_val,axis=2)==t_out_val,axis=0))
+# plt.ylabel('Accuracy', fontsize=15)
+# plt.xlabel('Target position', fontsize=15)
+# #plt.title('', fontsize=20)
+# plt.grid('on')
+# plt.show()
+# #why do the plot look like this?
+# #-------------------------------------------------------------------saving the model----------------------------------------------
+# ## Save model
+# # Read more about saving and loading models at https://www.tensorflow.org/programmers_guide/saved_model
+#
+# # Save model
+# save_path = tf.train.Saver().save(sess, "/tmp/modelRNN.ckpt")
+# print("Model saved in file: %s" % save_path)
 
-# Save model
-save_path = tf.train.Saver().save(sess, "/tmp/modelRNN.ckpt")
-print("Model saved in file: %s" % save_path)
+
+# test the model:
+for i in range (1,10):
+    X_tr, X_len_tr, t_in_tr, t_out_tr, t_len_tr, t_out_len_tr, t_mask_tr, \
+             text_targets_in_tr, text_targets_out_tr = \
+                get_batch_comma(batch_size=1,indices_of_interest = [70000+i])
+    # make fetches
+    fetches_tr = [train_op, loss, accuracy, y]
+    # set up feed dict
+    feed_dict_tr = {Xs: X_tr, X_len: X_len_tr, ts_in: t_in_tr,
+             ts_out: t_out_tr, t_in_len: t_len_tr, t_out_len: t_out_len_tr,t_mask: t_mask_tr}
+    # run the model
+    res = tuple(sess.run(fetches=fetches_tr, feed_dict=feed_dict_tr))
+    #print("input", text_inputs_tr)
+    if (t_out_tr-np.argmax(res[3], axis = 2)).any():
+        print("fail! index", i)
+        print("fail! target: ", t_out_tr)
+        print("fail! output: ", res[3])
+    print("input", text_targets_in_tr)
+    print("y: ", np.argmax(res[3],axis = 2))
+
+    # convert input back to text:
+    outputStr = ""
+
+    for j in range(0,X_len_tr[0]):
+        if t_out_tr[0][j] == 1:
+            outputStr+=","
+
+        outputStr += " "
+        outputStr+=get_word_stem_from_encoding(X_tr[0][j])
+
+    print(outputStr)
+
+
+
+
+
 
 ## Close the session, and free the resources
 sess.close()

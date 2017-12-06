@@ -20,11 +20,14 @@ while decrement:
         decrement = True
 
 
-#with open("Data\word_stems.csv", mode='r') as wordStems:
-#    reader = csv.reader(wordStems, delimiter = ";")
-#    encoding_to_word_stem = {rows[1]:rows[0] for rows in reader}
+with open("Data\word_stems.csv", mode='r') as wordStems:
+   reader = csv.reader(wordStems, delimiter = "¡")
+   encoding_to_word_stem = {rows[1]:rows[0] for rows in reader}
+   #print(encoding_to_word_stem)
 
-#print("Wordstem", encoding_to_word_stem['99060'])
+
+def get_word_stem_from_encoding(encoding):
+    return encoding_to_word_stem[str(encoding)]
 
 
 commaEncoding = 87678
@@ -49,7 +52,7 @@ with open("Data\onehot_encoded.csv", mode='r') as oneHotEncoded:
         for number in re.findall(pattern, mads):
             s = s + str(number) + " "
         sen = len(s.split(' '))
-        if commaEncodingString in s and sen<30:  
+        if commaEncodingString in s and sen<30:
             #print(s)
             listOfSentences.append(s)
         
@@ -93,14 +96,15 @@ def get_batch_comma(batch_size = 100, indices_of_interest = [0,1,2]):
         
         #convert input sequence to either "no comma" or comma, and use that sequence as output.      
        
-        int_target_out = [1 for digit in int_target_in if digit is not commaEncoding]
+        int_target_out = [0 for digit in int_target_in if digit is not commaEncoding]
         
         indexOfComma = listOfIntTarget.index(commaEncodingString)
 
         ##It is no use just sorting it out - then we cannot deliver the promised land... FIX!!!
-        #if len(int_target_out)<=indexOfComma:
-        #    continue
-        int_target_out[indexOfComma] = 2
+        if len(int_target_out)<=indexOfComma:
+            print("index of comma is at the end of the sentence ", indexOfComma)
+        else:
+            int_target_out[indexOfComma] = 1
         
         
         #print("int_target_in", int_target_in)
