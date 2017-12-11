@@ -57,13 +57,13 @@ tf.reset_default_graph()
 NUM_INPUTS = 133000
 NUM_OUTPUTS = 2#0,1,2 #(0-19 +",")
 
-BATCH_SIZE = 512
+BATCH_SIZE = 256
 # try various learning rates 1e-2 to 1e-5
 LEARNING_RATE = 0.005 #0.005
 X_EMBEDDINGS = 8
 t_EMBEDDINGS = 8
-NUM_UNITS_ENC = 16 #512
-NUM_UNITS_DEC = 16 #512
+NUM_UNITS_ENC = 128 #512
+NUM_UNITS_DEC = 128 #512
 number_of_layers = 1 #3
 
 
@@ -215,7 +215,7 @@ for var in tf.all_variables():
 ## Start the session
 # restricting memory usage, TensorFlow is greedy and will use all memory otherwise
 gpu_opts = tf.GPUOptions(per_process_gpu_memory_fraction=0.35)
-sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts))
+sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_opts, inter_op_parallelism_threads=4, intra_op_parallelism_threads=4))
 
 # Initialize parameters
 if load_model:
@@ -280,12 +280,13 @@ print("t_out_val", t_out_val.shape)
 ## If you get an error, remove this line! It makes the error message hard to understand.
 
 # setting up running parameters
-val_interval = 40
+val_interval = 300
 saver = tf.train.Saver()
 samples_val = []
 epochs, costs, accs_val = [], [], []
 plt.figure()
 train_acc = []
+corr_train = []
 batch_number = 0
 if load_model == False:
     try:
@@ -294,6 +295,7 @@ if load_model == False:
             accs_val = []
             loss_train = 0
             acc_train = 0
+            cor_train = 0
             print("Epoch: ", epoch)
             if epoch % 5 == 0:
                 saver.save(sess, "/tmp/RNN/modelRNN.ckpt", global_step=epoch)
@@ -307,15 +309,16 @@ if load_model == False:
                 text_targets_in_tr, text_targets_out_tr = \
                     get_batch_comma(batch_size=BATCH_SIZE, indices_of_interest=idxs)
                 # make fetches
-                fetches_tr = [train_op, loss, accuracy]
+                fetches_tr = [train_op, loss, accuracy, cor1]
                 # set up feed dict
                 feed_dict_tr = {Xs: X_tr, X_len: X_len_tr, ts_in: t_in_tr,
                                 ts_out: t_out_tr, t_in_len: t_len_in_tr, t_out_len: t_len_out_tr, t_mask: t_mask_tr}
                 # run the model
                 res = tuple(sess.run(fetches=fetches_tr, feed_dict=feed_dict_tr))
-                _, batch_cost, batch_acc = res
+                _, batch_cost, batch_acc, batch_cor = res
                 loss_train += batch_cost
                 acc_train += batch_acc
+                cor_train += batch_cor
 
                 # if samples_processed % 1000 == 0: print(batch_cost, batch_acc)
                 # validation data
@@ -334,7 +337,7 @@ if load_model == False:
                     print("correct: ", cor)
                     print("Epoch-batches ", epoch_batches)
                     print("accs_val: ", accs_val)
-                    print("accs_train: ", accuracy)
+
                     plt.figure(1)
                     plt.plot(epoch_batches, accs_val, 'g-')
                     plt.ylabel('Validation Accuracy', fontsize=15)
@@ -348,9 +351,11 @@ if load_model == False:
             costs += [loss_train]
             epochs += [epoch]
             train_acc += [acc_train / num_batches_train]
+            corr_train += [cor_train / num_batches_train]
             print("Costs: ", costs)
             print("Epochs: ", epochs)
             print("train Acc:", train_acc)
+            print("# of Correct sentences: ", corr_train)
             # plt.subplot(num_classes + 2, 2, 3)
             plt.figure(2)
             plt.legend('training loss')
