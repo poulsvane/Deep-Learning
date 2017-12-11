@@ -22,7 +22,7 @@ import tf_utils
 
 # At the bottom of the script there is some code which saves the model.
 # If you wish to restore your model from a previous state use this function.
-load_model = True
+load_model = False
 
 #-------------------------------------------- play around with input data... to be replaced with specific code------------------
 batch_size = 2
@@ -175,10 +175,17 @@ def loss_and_acc(preds):
     argmax = tf.to_int32(tf.argmax(preds, 2))
     correct = tf.to_float(tf.equal(argmax, ts_out)) * t_mask
     accuracy = tf.reduce_sum(correct) / tf.reduce_sum(t_mask)
-    return loss, accuracy, argmax
 
-loss, accuracy, predictions = loss_and_acc(y)
-loss_valid, accuracy_valid, predictions_valid = loss_and_acc(y_valid)
+## Calculate only relevant part of accuracy
+    correct1 = tf.reduce_sum(correct,1)-tf.reduce_sum(t_mask, 1)   
+    correct2 = tf.clip_by_value(correct1, -1.0,1.0)
+    #correct25 = tf.count_nonzero(correct2, dtype=tf.float32)
+    correct3 = tf.subtract(1.0,tf.divide(tf.count_nonzero(correct2, dtype=tf.float32), tf.cast(tf.shape(correct)[0],tf.float32)))
+    
+    return loss, accuracy, argmax, correct3
+
+loss, accuracy, predictions, cor1 = loss_and_acc(y)
+loss_valid, accuracy_valid, predictions_valid, cor1_val = loss_and_acc(y_valid)
 
 # use lobal step to keep track of our iterations
 global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -314,16 +321,17 @@ if load_model == False:
                 # validation data
                 if i % val_interval == 0:
                     print("validating")
-                    fetches_val = [accuracy_valid, y_valid]
+                    fetches_val = [accuracy_valid, y_valid, cor1_val]
                     feed_dict_val = {Xs: X_val, X_len: X_len_val, ts_in: t_in_val,
                                      ts_out: t_out_val, t_in_len: t_len_in_val, t_out_len: t_len_out_val,
                                      t_mask: t_mask_val}
                     res = tuple(sess.run(fetches=fetches_val, feed_dict=feed_dict_val))
 
-                    acc_val, output_val = res
+                    acc_val, output_val, cor = res
 
                     accs_val += [acc_val]
                     epoch_batches += [epoch * num_batches_train + i]
+                    print("correct: ", cor)
                     print("Epoch-batches ", epoch_batches)
                     print("accs_val: ", accs_val)
                     print("accs_train: ", accuracy)
