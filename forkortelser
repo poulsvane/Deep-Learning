@@ -1,0 +1,54 @@
+from lxml import html
+import requests
+import csv
+
+
+def forkortelser():
+    # get raw words from "syntaksis"
+    x = "https://syntaksis.dk/forkortelser/"
+    page = requests.get(x)
+    tree = html.fromstring(page.content)
+    shorts_1 = tree.xpath('//td[@class="column-1"]/text()')
+
+    # split off and trim by ()
+    shorts_1_1 = [x.split("(") for x in shorts_1]
+    result_1 = [val.replace(")", "") for sublist in shorts_1_1 for val in sublist]
+
+    # Get raw words from "grafisk-litteratur"
+    x = "http://www.grafisk-litteratur.dk/?id=16"
+    page = requests.get(x)
+    tree = html.fromstring(page.content)
+    shorts_2 = tree.xpath('//div[@class="forkortelse"]/text()')
+
+    # split by , and "eller", and flatten the resulting list
+    n_1 = [x.split(",") for x in shorts_2]
+    n_2 = [x.split("eller") for sublist in n_1 for x in sublist]
+    n_3 = [x for sublist in n_2 for x in sublist]
+
+    # split the few words with a / without meaning in it, by /
+    # THIS SHOULD BE RE-CHECKED WHEN RUN FOR FINAL IMPORT
+    result_2 = []
+    for index, item in enumerate(n_3):
+        if index in {67, 84, 85, 86, 172, 174}:
+            x = item.split("/")
+            for i in x:
+                result_2.append(i)
+        else:
+            result_2.append(item)
+
+    # combine data from "syntaksis" and "grafisk-litteratur"
+    result_1.extend(result_2)
+    # strip beginning and ending whitespace from words
+    result = [x.strip(" ") for x in result_1]
+    list(set(result))
+    return result
+
+
+def writer(data):
+    with open("forkortelser.csv", 'w', encoding="utf-8") as resultFile:
+        wr = csv.writer(resultFile, dialect="excel", delimiter="\n")
+        wr.writerow(data)
+
+
+res = forkortelser()
+writer(res)

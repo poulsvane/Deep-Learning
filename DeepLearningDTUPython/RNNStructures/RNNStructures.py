@@ -75,6 +75,7 @@ X_len = tf.placeholder(tf.int32, shape=[None], name='X_len')
 t_in_len = tf.placeholder(tf.int32, shape=[None], name='t_in_len')
 t_out_len = tf.placeholder(tf.int32, shape=[None], name='t_out_len')
 t_mask = tf.placeholder(tf.float32, shape=[None, None], name='t_mask')
+drop = tf.placeholder_with_default(0,shape =())
 
 
 ### Building the model
@@ -92,7 +93,8 @@ t_embedded = tf.gather(t_embeddings, ts_in, name='embed_t')
 enc_cell = tf.nn.rnn_cell.GRUCell(NUM_UNITS_ENC)
 
 def gru_cell():
-    return tf.nn.rnn_cell.GRUCell(NUM_UNITS_ENC)
+    cell = tf.nn.rnn_cell.GRUCell(NUM_UNITS_ENC)
+    return tf.nn.rnn_cell.DropoutWrapper(cell, output_keep_prob=1-drop)
 stacked_gru = tf.contrib.rnn.MultiRNNCell(
     [gru_cell() for _ in range(number_of_layers)])
 
@@ -257,6 +259,7 @@ res = sess.run(fetches=fetches, feed_dict=feed_dict)
 print("y_valid", res[0].shape)
 
 #Some Data hyperparameters
+dropout_perc = 0.3
 num_epochs = 200
 num_of_training_samples_loaded = num_of_training_samples()
 num_of_samples_for_validation = 10000
@@ -311,8 +314,8 @@ if load_model == False:
                 # make fetches
                 fetches_tr = [train_op, loss, accuracy, cor1]
                 # set up feed dict
-                feed_dict_tr = {Xs: X_tr, X_len: X_len_tr, ts_in: t_in_tr,
-                                ts_out: t_out_tr, t_in_len: t_len_in_tr, t_out_len: t_len_out_tr, t_mask: t_mask_tr}
+                feed_dict_tr = {Xs: X_tr, X_len: X_len_tr, ts_in: t_in_tr, ts_out: t_out_tr, t_in_len: t_len_in_tr,
+                                t_out_len: t_len_out_tr, t_mask: t_mask_tr, drop: dropout_perc}
                 # run the model
                 res = tuple(sess.run(fetches=fetches_tr, feed_dict=feed_dict_tr))
                 _, batch_cost, batch_acc, batch_cor = res
