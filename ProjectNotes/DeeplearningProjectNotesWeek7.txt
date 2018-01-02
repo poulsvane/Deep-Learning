@@ -1,0 +1,44 @@
+Deep learning projekt:
+
+
+Mål:
+- Lav et værktøj, der givet en sætning, kan afgøre om kommattering er korrekt.
+- (stretch goal): udvid værktøj, til automatisk at kunne sætte komma i en sætning.
+
+
+Datasæt:
+- Sætninger fra den store danske.
+
+
+Opgaver:
+
+Opgave 1: Data retrieval, cleaning og preparation.
+- Hiv datasæt ned (Poul) 100.000 sætninger til start (klar til uge 8)
+- Automatisk sanity check og forkast det der ikke består tjekkene (JP) (klar til uge 8)
+- manuelt sanity check (Pagh, Theis) (klar til uge 8)
+
+Opgave 1b:
+- udtræk den del af data sættet, som vi skal bruge i første omgang (indeholder præcis ét komma og max 10 ord) (JP) (klar til uge 8). 
+
+Opgave 2:
+- Træn et RNN til at finde det index i en given sætning, hvor kommaet bør være.
+
+Opgave 2a:
+- Find et fornuftigt format til at indkode vores problem som:
+
+Format: 
+Datasæt inkodes som en "sætning" matchende til en "label" som er det index i sætning hvor komma skal være.
+
+Indkodning af en sætning:
+En sætning indkodes som en Vektor af ord og tegn. afsluttende med EOS.
+
+Hvert ord indkodes som en vektor af to dele:
+- del 1: selve ordet, indkodes som "one hot" ud af alle mulige ord. (i bydeform) En vector med høj dimensionalitet
+- del 2: endelsen af ordet enkodes som character encoding. Tilføj padding op til 5 eller 6.
+
+Opgave 2b:
+- Gør det muligt at indkode vores ord som "one hot" vektorer. Det kræver en "database" over alle ord i datasættet i bydeform samt adgang til et værktøj der kan "lemmatisere" et ord. Det vil sige at udlede ordstammen ud fra et givet ord. (Pagh og Poul)
+
+Opgave 2c:
+- Sæt en RNN struktur op, der kan håndtere de ovenstående input og give en enkel label som output.
+
